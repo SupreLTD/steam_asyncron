@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "steam-asyncron"
+version = "0.1.0"
+description = ""
+authors = ["ivan <supreltd@gmail.com>"]
+readme = "README.md"
+packages = [{include = "steam_asyncron"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+aiohttp = "^3.8.5"
+asyncpg = "^0.28.0"
+pydantic = "^2.3.0"
+requests = "^2.31.0"
+beautifulsoup4 = "^4.12.2"
+loguru = "^0.7.2"
+tenacity = "^8.2.3"
+pandas = "^2.1.0"
+schedule = "^1.2.0"
+tqdm = "^4.66.1"
+funcy = "^2.0"
+lxml = "^4.9.3"
+ruff = "^0.0.289"
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "B", "Q"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
