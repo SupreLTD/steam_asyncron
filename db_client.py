@@ -7,12 +7,9 @@ from environs import Env
 env = Env()
 env.read_env()
 
+
 class DbPostgres:
     __instance = None
-    DBNAME = 'postgres'
-    USER = 'postgres'
-    PASSWORD = 'postgres'
-    HOST = '127.0.0.1'
 
     def __new__(cls, *args, **kwargs):
         if cls.__instance is None:
@@ -67,12 +64,7 @@ class DbPostgres:
 
     @classmethod
     def __connection(cls, factory=None):
-        conn = psycopg2.connect(
-            dbname=cls.DBNAME,
-            user=cls.USER,
-            password=cls.PASSWORD,
-            host=cls.HOST,
-        )
+        conn = psycopg2.connect(env.str("DB"))
         conn.autocommit = True
         # Dic - возвращает словарь - ключ/значение
         if factory == 'dict':
