@@ -1,7 +1,11 @@
+import asyncpg
 import psycopg2
 
 from psycopg2 import extras
+from environs import Env
 
+env = Env()
+env.read_env()
 
 class DbPostgres:
     __instance = None
@@ -44,7 +48,7 @@ class DbPostgres:
         except (Exception, psycopg2.Error) as error:
             self.__error(error)
 
-    def query_update(self, query:str, arg=None, message='Ok', many=False):
+    def query_update(self, query: str, arg=None, message='Ok', many=False):
         """
         Обновляет данные в таблице и возвращает сообщение об успешной операции
         :param query: Запрос
@@ -111,3 +115,20 @@ class DbPostgres:
     def __error(error):
         # В том числе, если в БД данных нет, будет ошибка на этапе fetchone
         print(error)
+
+
+async def save_in_db(query: str, data: tuple | list[tuple], many: bool = False) -> None:
+    """
+
+    :param query: SQL query
+    :param data: tuple or list
+    :param many: if many is False -> working execute adn data is tuple,
+                 if many is True -> working executemany and data is list[tuple]
+    :return: None
+    """
+    async with await asyncpg.create_pool(env.str("DB")) as pool:
+        async with pool.acquire() as conn:
+            if many:
+                await conn.executemany(query, data)
+            else:
+                await conn.fetch(query, data)
