@@ -1,3 +1,4 @@
 .env
 poetry.lock
 .ruff_cache
+.idea

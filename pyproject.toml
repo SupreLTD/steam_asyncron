@@ -23,6 +23,8 @@ lxml = "^4.9.3"
 ruff = "^0.0.289"
 environs = "^9.5.0"
 faker = "^19.6.1"
+grequests = "^0.7.0"
+psycopg2-binary = "^2.9.7"
 
 [tool.ruff]
 line-length = 120
