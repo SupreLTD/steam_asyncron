@@ -57,7 +57,7 @@ class DbPostgres:
         """
         try:
             with self.__connection() as cur:
-                self.__execute(cur, query, many, arg)
+                self.__execute(cur, query, arg, many)
             print(message)
 
         except (Exception, psycopg2.Error) as error:
@@ -82,7 +82,7 @@ class DbPostgres:
         return cur
 
     @staticmethod
-    def __execute(cur, query, arg=None, many=False, ):
+    def __execute(cur, query, arg=None, many=False):
         # Метод 'execute' всегда возвращает None
         if many:
             if arg:
@@ -126,7 +126,3 @@ async def save_in_db(query: str, data: tuple | list[tuple], many: bool = False) 
             else:
                 await conn.fetch(query, data)
 
-
-# db = DbPostgres()
-# print(list(chunks(1000, list(map(lambda el: el[0], db.fetch_all("""SELECT link FROM games_links"""))))))
-# print(list(map(lambda el: el[0], db.fetch_all("""SELECT link FROM games_links"""))))
