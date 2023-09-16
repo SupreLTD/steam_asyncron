@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from aiohttp import ClientSession
 from loguru import logger
 from db_client import save_in_db, DbPostgres
-
+from memory_profiler import profile
 
 db = DbPostgres()
 
@@ -33,16 +33,33 @@ cookies = {
 with open('proxies.txt') as f:
     proxies = [i.strip() for i in f.readlines()]
 
+DATE_PATTERN = {
+    "янв": "01",
+    "фев": "02",
+    "мар": "03",
+    "апр": "04",
+    "мая": "05",
+    "илн": "06",
+    "июл": "07",
+    "авг": "08",
+    "сен": "09",
+    "окт": "10",
+    "ноя": "11",
+    "дек": "12"
+}
 
+
+@retry
 async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple:
     proxy = random.choice(proxies)
     async with session.get(url, proxy=proxy) as response:
-        logger.info(f'response status: {response.status} | {url}')
+        logger.info(f'response status: {response.status} | {url} ')
         assert response.status == 200
-        soup = BeautifulSoup(await response.text(), 'lxml')
+        soup = BeautifulSoup(await response.read(), 'lxml')
         assert soup is not None
         data = {}
         title = soup.find('div', {'id': 'appHubAppName'})
+
         pattern = r'/app/(\d+)/'
         match = re.search(pattern, url)
 
@@ -51,7 +68,9 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
 
         # Заголовок
         data['Заголовок'] = title.get_text() if title else ''
-
+        if data['Заголовок'] == '':
+            return
+        logger.info(data['Заголовок'])
         # Цены и издания
         data['Издания'] = None
         data['Цены изданий'] = None
@@ -126,9 +145,12 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
         date = ''
         try:
             date = soup.find('div', {'class': 'date'}).get_text()
+            date = '.'.join([DATE_PATTERN[i] if i.isalpha() else i for i in date.replace('.', '').split()])
 
         except Exception as ex:
             logger.error(f"Дата выхода: {ex} - {url}")
+            with open('test.html', 'w') as f:
+                f.write(str(soup))
         data['Дата выхода'] = date
 
         # Платформа
@@ -215,23 +237,24 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
                 if 'Место на диске' in key:
                     data['Место на диске'] = value
 
-    print(data)
+        return data
 
 
 async def parse():
     categories = (('games_links', 'games'), ('dlc_links', 'dlc'))
-    for category in categories:
-        query = f"SELECT link FROM {category[0]}"
-        query_save = f"INSERT INTO {category[1]} VALUES ()"
-        links = list(chunks(1000, list(map(lambda el: el[0], db.fetch_all(query)))))
+    async with ClientSession(headers=headers, cookies=cookies) as session:
+        for category in categories:
+            query = f"SELECT link FROM {category[0]} limit 4000"
+            query_save = f"INSERT INTO {category[1]} VALUES ()"
+            links = list(chunks(1000, list(map(lambda el: el[0], db.fetch_all(query)))))
 
-        for link in links:
-            async with ClientSession(headers=headers, cookies=cookies) as session:
+            for link in links:
+
                 tasks = []
                 for url in link:
                     task = asyncio.create_task(get_data(session, url))
                     tasks.append(task)
-                result = await asyncio.gather(*tasks)
+                await asyncio.gather(*tasks)
                 # result = sum(result, [])
                 # await save_in_db(query_save, result, many=True)
 
