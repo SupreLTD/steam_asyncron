@@ -9,15 +9,18 @@ from db_client import DbPostgres
 
 db = DbPostgres()
 
+url = 'https://store.steampowered.com/search/results/?query=&start=150&count=100&dynamic_data=&force_infinite=1&category1=998,21&ndl=1&snr=1_7_7_230_7&infinite=1'
+
 
 def get_all_links() -> None:
     cnt = count()
     print(cnt)
-    params = ((cnt[0], "INSERT INTO games_links (link) VALUES (unnest(%s)) ON CONFLICT DO NOTHING", '988'), (cnt[1], "INSERT INTO dlc_links (link) VALUES (unnest(%s)) ON CONFLICT DO NOTHING", '21'))
+    params = ((cnt[0], "INSERT INTO games_links (link) VALUES (unnest(%s)) ON CONFLICT DO NOTHING", '988'),
+              (cnt[1], "INSERT INTO dlc_links (link) VALUES (unnest(%s)) ON CONFLICT DO NOTHING", '21'))
     for param in params:
 
         links = [
-            f'https://store.steampowered.com/search/results/?query=&start={str(i)}&count=100&dynamic_data=&force_infinite=1&category1={param[2]}&ndl=1&snr=1_7_7_230_7&infinite=1'
+            f'https://store.steampowered.com/search/results/?query=&start={str(i)}&count=100&dynamic_data=&force_infinite=1&category1=998,21&ndl=1&snr=1_7_7_230_7&infinite=1'
             for i in range(0, param[0], 100)]
         links.append(
             f'https://store.steampowered.com/search/results/?query=&start={str(param[0])}&count=100&dynamic_data=&force_infinite=1&category1={param[2]}&ndl=1&snr=1_7_7_230_7&infinite=1')

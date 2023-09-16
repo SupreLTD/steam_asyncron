@@ -11,7 +11,7 @@ from loguru import logger
 from db_client import save_in_db, DbPostgres
 
 db = DbPostgres()
-
+db.query_update("""TRUNCATE games""")
 headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0',
     'Accept': 'text/javascript, text/html, application/xml, text/xml, */*',
@@ -235,6 +235,7 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
 
 async def parse() -> None:
     categories = ('games_links', 'dlc_links')
+
     async with ClientSession(headers=headers, cookies=cookies) as session:
         for category in categories:
             query = f"SELECT link FROM {category}"
@@ -251,7 +252,7 @@ async def parse() -> None:
                 result = list(filter(None, result))
                 await save_in_db("""INSERT INTO games (appid, title, edition, price, full_price, developer, 
                 publisher, dlc, genre, date, platform, language, cover, images, description, requirements) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)""", result, many=True)
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT DO NOTHING """, result, many=True)
                 logger.debug(f"Seved in DB {len(result)}")
 
 
