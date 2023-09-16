@@ -1,16 +1,14 @@
 import asyncio
-import random
+from random import shuffle, choice
 import re
 
 from funcy import chunks
 from tenacity import retry
-from get_count import count
-import requests
+from tqdm import tqdm
 from bs4 import BeautifulSoup
 from aiohttp import ClientSession
 from loguru import logger
 from db_client import save_in_db, DbPostgres
-from memory_profiler import profile
 
 db = DbPostgres()
 
@@ -39,7 +37,7 @@ DATE_PATTERN = {
     "мар": "03",
     "апр": "04",
     "мая": "05",
-    "илн": "06",
+    "июн": "06",
     "июл": "07",
     "авг": "08",
     "сен": "09",
@@ -50,8 +48,8 @@ DATE_PATTERN = {
 
 
 @retry
-async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple:
-    proxy = random.choice(proxies)
+async def get_data(session: ClientSession, url: str) -> tuple | None:
+    proxy = choice(proxies)
     async with session.get(url, proxy=proxy) as response:
         logger.info(f'response status: {response.status} | {url} ')
         assert response.status == 200
@@ -107,6 +105,8 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
         except Exception:
             logger.error(f"Цены и издания: {url}")
             return ()
+        if data['Издания'] in ('', None):
+            return
 
         # Разработчик, издатель
         data['Разработчик'] = ""
@@ -118,16 +118,21 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
                 if dev_row:
                     try:
                         data['Разработчик'] = dev_row[0].find('div', {'class': 'summary column'}).get_text(strip=True)
-                    except:
+                    except Exception as e:
                         data['Разработчик'] = ''
                     try:
                         data['Издатель'] = dev_row[1].find('div', {'class': 'summary column'}).get_text(strip=True)
-                    except:
+                    except Exception as e:
                         data['Издатель'] = ""
         except Exception as ex:
             logger.error(f"Разработчик, издатель: {ex} - {url}")
 
-        data['Дополнение'] = 'dls_name'
+        # DLC
+        try:
+            dlc = soup.find('div', class_='glance_details').find('a', href=True).text
+        except Exception as e:
+            dlc = ''
+        data['Дополнение'] = dlc
 
         # Жанр
         genres = []
@@ -149,8 +154,7 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
 
         except Exception as ex:
             logger.error(f"Дата выхода: {ex} - {url}")
-            with open('test.html', 'w') as f:
-                f.write(str(soup))
+
         data['Дата выхода'] = date
 
         # Платформа
@@ -186,7 +190,7 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
 
         if language == 3:
             language = 'Полная локализация'
-        elif language < 3 and language > 0:
+        elif 3 > language > 0:
             language = 'Только субтитры'
         elif language == 0:
             language = 'Нет'
@@ -199,64 +203,49 @@ async def get_data(session: ClientSession, url: str, dls: bool = False) -> tuple
         imgs = soup.find_all('a', {'class': 'highlight_screenshot_link'})
         imgs = [img.get('href') for img in imgs] if imgs else []
         data['Обложка'] = preview
-        data['Изображения'] = ', '.join(imgs)
+        data['Изображения'] = ', '.join(imgs[:3])
 
         # Описание
         description = soup.find('div', {'id': 'game_area_description'})
-        # data['Описание'] = ''.join(str(item).strip() for item in description.contents) if description else ''
         data['Описание'] = description.get_text() if description else ''
 
         # Системные требования
         left_col = soup.find('div', {'class': 'game_area_sys_req sysreq_content active'})
         li_elements = left_col.select('ul.bb_ul li') if left_col else []
 
-        data['ОС'] = ""
-        data['Процессор'] = ""
-        data['Оперативная память'] = ""
-        data['Видеокарта'] = ""
-        data['DirectX'] = ""
-        data['Место на диске'] = ""
-
+        data['Системные'] = ""
+        sys_values = []
         for li_element in li_elements:
             strong_tag = li_element.find('strong')
             if strong_tag:
                 key = strong_tag.get_text(strip=True)
                 value = re.sub(rf'^{re.escape(key)}:', '', li_element.get_text(strip=True))
-                value = value.replace(key, '').strip()
+                value = value.strip()
+                sys_values.append(value)
 
-                if 'ОС' in key:
-                    data['ОС'] = value
-                if 'Процессор' in key:
-                    data['Процессор'] = value
-                if 'Оперативная память' in key:
-                    data['Оперативная память'] = value
-                if 'Видеокарта' in key:
-                    data['Видеокарта'] = value
-                if 'DirectX' in key:
-                    data['DirectX'] = value
-                if 'Место на диске' in key:
-                    data['Место на диске'] = value
+        data['Системные'] = ',\n'.join(sys_values)
 
-        return data
+        return tuple(data.values())
 
 
-async def parse():
+async def parse() -> None:
     categories = (('games_links', 'games'), ('dlc_links', 'dlc'))
     async with ClientSession(headers=headers, cookies=cookies) as session:
         for category in categories:
-            query = f"SELECT link FROM {category[0]} limit 4000"
-            query_save = f"INSERT INTO {category[1]} VALUES ()"
-            links = list(chunks(1000, list(map(lambda el: el[0], db.fetch_all(query)))))
+            query = f"SELECT link FROM {category[0]}"
+            query_save = f"INSERT INTO {category[1]} (appid, title, edition, price, full_price, developer, publisher, dlc, genre, date, platform, language, cover, images, description, requirements) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)"
+            links = list(map(lambda el: el[0], db.fetch_all(query)))
+            shuffle(links)
+            links = list(chunks(600, links))
 
-            for link in links:
-
+            for link in tqdm(links):
                 tasks = []
                 for url in link:
                     task = asyncio.create_task(get_data(session, url))
                     tasks.append(task)
-                await asyncio.gather(*tasks)
-                # result = sum(result, [])
-                # await save_in_db(query_save, result, many=True)
+                result = await asyncio.gather(*tasks)
+                result = list(filter(None, result))
+                await save_in_db(query_save, result, many=True)
 
 
 if __name__ == '__main__':

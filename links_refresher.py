@@ -12,6 +12,7 @@ db = DbPostgres()
 
 def get_all_links() -> None:
     cnt = count()
+    print(cnt)
     params = ((cnt[0], "INSERT INTO games_links (link) VALUES (unnest(%s)) ON CONFLICT DO NOTHING", '988'), (cnt[1], "INSERT INTO dlc_links (link) VALUES (unnest(%s)) ON CONFLICT DO NOTHING", '21'))
     for param in params:
 
