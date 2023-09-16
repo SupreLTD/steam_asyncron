@@ -67,6 +67,7 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
         # Заголовок
         data['Заголовок'] = title.get_text() if title else ''
         if data['Заголовок'] == '':
+            logger.error(f"Title is {data['Заголовок']}")
             return
         logger.info(data['Заголовок'])
         # Цены и издания
@@ -88,8 +89,8 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
                                 price = game.find(attrs={"data-price-final": True})
                                 if price:
                                     editions.append(edition.get_text(strip=True).replace('Купить', ''))
-                                    prices.append(
-                                        str(round(float(price.get('data-price-final')) / 100, 2))) if price else None
+                                    price = str(round(float(price.get('data-price-final')) / 100, 2))
+                                    prices.append(price)
 
                                     old_price = game.find('div', {'class': 'discount_original_price'})
                                     if old_price:
@@ -97,6 +98,9 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
                                         old_price = old_price.replace(',', '.') if old_price else None
                                         match = re.search(r"(\d+(?:\.\d+)?)", old_price)
                                         old_price = match.group(1) if match else None
+                                        old_prices.append(old_price)
+                                    else:
+                                        old_price = price
                                         old_prices.append(old_price)
 
                     data['Издания'] = ', '.join(editions)
@@ -106,6 +110,7 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
             logger.error(f"Цены и издания: {url}")
             return ()
         if data['Издания'] in ('', None):
+            logger.error(f"No paid content found")
             return
 
         # Разработчик, издатель
@@ -162,8 +167,8 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
         try:
             platforms = []
             for platform in soup.find_all('div', {'class': 'sysreq_tab'}):
-                platforms.append(platform.get_text()) if platform else None
-            data['Платформы'] = ','.join(platforms)
+                platforms.append(platform.get_text(strip=True)) if platform else None
+            data['Платформы'] = ', '.join(platforms)
         except Exception as ex:
             logger.error(f"Платформа: {ex} - {url}")
 
@@ -229,14 +234,13 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
 
 
 async def parse() -> None:
-    categories = (('games_links', 'games'), ('dlc_links', 'dlc'))
+    categories = ('games_links', 'dlc_links')
     async with ClientSession(headers=headers, cookies=cookies) as session:
         for category in categories:
-            query = f"SELECT link FROM {category[0]}"
-            query_save = f"INSERT INTO {category[1]} (appid, title, edition, price, full_price, developer, publisher, dlc, genre, date, platform, language, cover, images, description, requirements) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)"
+            query = f"SELECT link FROM {category}"
             links = list(map(lambda el: el[0], db.fetch_all(query)))
             shuffle(links)
-            links = list(chunks(600, links))
+            links = list(chunks(1500, links))
 
             for link in tqdm(links):
                 tasks = []
@@ -245,7 +249,10 @@ async def parse() -> None:
                     tasks.append(task)
                 result = await asyncio.gather(*tasks)
                 result = list(filter(None, result))
-                await save_in_db(query_save, result, many=True)
+                await save_in_db("""INSERT INTO games (appid, title, edition, price, full_price, developer, 
+                publisher, dlc, genre, date, platform, language, cover, images, description, requirements) VALUES (
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)""", result, many=True)
+                logger.debug(f"Seved in DB {len(result)}")
 
 
 if __name__ == '__main__':
