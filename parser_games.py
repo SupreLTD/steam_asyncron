@@ -89,7 +89,7 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
                                 price = game.find(attrs={"data-price-final": True})
                                 if price:
                                     editions.append(edition.get_text(strip=True).replace('Купить', ''))
-                                    price = str(round(float(price.get('data-price-final')) / 100, 2))
+                                    price = f"{round(float(price.get('data-price-final')) / 100, 2):.2f}"
                                     prices.append(price)
 
                                     old_price = game.find('div', {'class': 'discount_original_price'})
@@ -98,7 +98,7 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
                                         old_price = old_price.replace(',', '.') if old_price else None
                                         match = re.search(r"(\d+(?:\.\d+)?)", old_price)
                                         old_price = match.group(1) if match else None
-                                        old_prices.append(old_price)
+                                        old_prices.append(f"{float(old_price):.2f}")
                                     else:
                                         old_price = price
                                         old_prices.append(old_price)
