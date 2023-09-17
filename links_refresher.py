@@ -46,7 +46,7 @@ async def get_data(session: ClientSession, link: str) -> list[tuple]:
     return links
 
 
-async def main():
+async def refresh_links():
     async with ClientSession(headers=headers) as session:
         async with session.get(url=url) as response:
             count = await response.json()
@@ -62,7 +62,7 @@ async def main():
             f"https://store.steampowered.com/search/results/?query=&start={str(count)}&count=100&dynamic_data"
             f"=&force_infinite=1&hidef2p=1sort_by=_ASC&category1=998,21&ndl=1&snr=1_7_7_230_7&infinite=1")
         links = list(chunks(200, links))
-        for bundle in tqdm(links, desc='Refresh links in DB'):
+        for bundle in tqdm(links, desc='Refresh links in DB: '):
             tasks = []
             for link in bundle:
                 task = asyncio.create_task(get_data(session, link))
