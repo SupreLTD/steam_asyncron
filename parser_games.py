@@ -234,27 +234,25 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
 
 
 async def parse() -> None:
-    categories = ('games_links', 'dlc_links')
 
     async with ClientSession(headers=headers, cookies=cookies) as session:
-        for category in categories:
-            query = f"SELECT link FROM {category}"
-            links = list(map(lambda el: el[0], db.fetch_all(query)))
-            shuffle(links)
-            links = list(chunks(1500, links))
 
-            for link in tqdm(links):
-                tasks = []
-                for url in link:
-                    task = asyncio.create_task(get_data(session, url))
-                    tasks.append(task)
-                result = await asyncio.gather(*tasks)
-                result = list(filter(None, result))
-                await save_in_db("""INSERT INTO games (appid, title, edition, price, full_price, developer, 
-                publisher, dlc, genre, date, platform, language, cover, images, description, requirements) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT DO NOTHING """, result, many=True)
-                logger.debug(f"Seved in DB {len(result)}")
+        links = list(map(lambda el: el[0], db.fetch_all("""SELECT link FROM links""")))
+        shuffle(links)
+        links = list(chunks(1500, links))
+
+        for link in tqdm(links, desc='PARSE: '):
+            tasks = []
+            for url in link:
+                task = asyncio.create_task(get_data(session, url))
+                tasks.append(task)
+            result = await asyncio.gather(*tasks)
+            result = list(filter(None, result))
+            await save_in_db("""INSERT INTO games (appid, title, edition, price, full_price, developer, 
+            publisher, dlc, genre, date, platform, language, cover, images, description, requirements) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT (appid) 
+            DO UPDATE SET edition = EXCLUDED.edition,price = EXCLUDED.price, full_price = EXCLUDED.full_price""",
+                             result, many=True)
+            logger.debug(f"Saved in DB {len(result)}")
 
 
-if __name__ == '__main__':
-    asyncio.run(parse())
