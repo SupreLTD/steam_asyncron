@@ -50,7 +50,7 @@ DATE_PATTERN = {
 @retry
 async def get_data(session: ClientSession, url: str) -> tuple | None:
     proxy = choice(proxies)
-    async with session.get(url, proxy=proxy) as response:
+    async with session.get(url) as response:
         logger.info(f'response status: {response.status} | {url} ')
         assert response.status == 200
         soup = BeautifulSoup(await response.read(), 'lxml')
@@ -69,50 +69,6 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
         if data['Заголовок'] == '':
             logger.error(f"Title is {data['Заголовок']}")
             return
-        logger.info(data['Заголовок'])
-        # Цены и издания
-        data['Издания'] = None
-        data['Цены изданий'] = None
-        data['Цены изданий без скидки'] = None
-        try:
-            game_area_purchase = soup.find('div', {'class': 'game_area_purchase'})
-            if game_area_purchase:
-                game_area_purchase_game = game_area_purchase.find_all('div', {'class': 'game_area_purchase_game'})
-                if game_area_purchase_game:
-                    editions = []
-                    prices = []
-                    old_prices = []
-                    for game in game_area_purchase_game:
-                        if not "demo_above_purchase" in game.get('class'):
-                            edition = game.find('h1')
-                            if edition and not 'НАБОР(?)' in edition.get_text(strip=True):
-                                price = game.find(attrs={"data-price-final": True})
-                                if price:
-                                    editions.append(edition.get_text(strip=True).replace('Купить', ''))
-                                    price = f"{round(float(price.get('data-price-final')) / 100, 2):.2f}"
-                                    prices.append(price)
-
-                                    old_price = game.find('div', {'class': 'discount_original_price'})
-                                    if old_price:
-                                        old_price = old_price.get_text()
-                                        old_price = old_price.replace(',', '.') if old_price else None
-                                        match = re.search(r"(\d+(?:\.\d+)?)", old_price)
-                                        old_price = match.group(1) if match else None
-                                        old_prices.append(f"{float(old_price):.2f}")
-                                    else:
-                                        old_price = price
-                                        old_prices.append(old_price)
-
-                    data['Издания'] = ', '.join(editions)
-                    data['Цены изданий'] = ', '.join(prices)
-                    data['Цены изданий без скидки'] = ', '.join(old_prices)
-        except Exception:
-            logger.error(f"Цены и издания: {url}")
-            return ()
-        if data['Издания'] in ('', None):
-            logger.error(f"No paid content found")
-            return
-
         # Разработчик, издатель
         data['Разработчик'] = ""
         data['Издатель'] = ""
@@ -234,7 +190,6 @@ async def get_data(session: ClientSession, url: str) -> tuple | None:
 
 
 async def parse() -> None:
-
     async with ClientSession(headers=headers, cookies=cookies) as session:
 
         links = list(map(lambda el: el[0], db.fetch_all("""SELECT link FROM links""")))
@@ -248,11 +203,8 @@ async def parse() -> None:
                 tasks.append(task)
             result = await asyncio.gather(*tasks)
             result = list(filter(None, result))
-            await save_in_db("""INSERT INTO games (appid, title, edition, price, full_price, developer, 
+            await save_in_db("""INSERT INTO all_games (appid, title, developer, 
             publisher, dlc, genre, date, platform, language, cover, images, description, requirements) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT (appid) 
-            DO UPDATE SET edition = EXCLUDED.edition,price = EXCLUDED.price, full_price = EXCLUDED.full_price""",
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING """,
                              result, many=True)
             logger.debug(f"Saved in DB {len(result)}")
-
-

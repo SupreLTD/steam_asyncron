@@ -39,7 +39,7 @@ async def get_data(session: ClientSession, link: str) -> list[tuple]:
             for a in soup.find_all('a', {'class': 'search_result_row ds_collapse_flag'}):
                 if a.find('div', {'class': 'discount_final_price'}):
                     link = a['href'].split('?')[0]
-                    if 'bundle' in link or 'oundtrack' in link:
+                    if 'bundle' in link or 'oundtrack' in link or '/sub/' in link:
                         continue
                     links.append((link,))
 
