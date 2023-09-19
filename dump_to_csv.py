@@ -1,9 +1,16 @@
+import os
 import pandas as pd
 from funcy import chunks
+import smtplib
 
 from db_client import DbPostgres
 
 db = DbPostgres()
+
+
+def cleaner() -> None:
+    for i in os.listdir('data'):
+        os.remove('data/' + i)
 
 
 def write_to_csv() -> None:
@@ -32,4 +39,7 @@ def write_to_csv() -> None:
         df.to_csv(fr"data/games_{number}.csv", index=False)
 
 
-write_to_csv()
+def dump():
+    cleaner()
+    write_to_csv()
+

@@ -124,5 +124,5 @@ async def save_in_db(query: str, data: tuple | list[tuple], many: bool = False) 
             if many:
                 await conn.executemany(query, data)
             else:
-                await conn.fetch(query, data)
+                await conn.execute(query, data)
 

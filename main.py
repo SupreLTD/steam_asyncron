@@ -1,7 +1,7 @@
 import asyncio
 
 from links_refresher import refresh_links
-from parser_games import parse
+from gam_parser import parse
 
 
 def main() -> None:
