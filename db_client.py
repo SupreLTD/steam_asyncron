@@ -65,7 +65,7 @@ class DbPostgres:
 
     @classmethod
     def __connection(cls, factory=None):
-        conn = psycopg2.connect(env.str("DB"))
+        conn = psycopg2.connect('postgres://postgres:postgres@localhost:5432/postgres')
         conn.autocommit = True
         # Dic - возвращает словарь - ключ/значение
         if factory == 'dict':
@@ -126,3 +126,9 @@ async def save_in_db(query: str, data: tuple | list[tuple], many: bool = False) 
             else:
                 await conn.execute(query, data)
 
+
+async def ids_for_fast() -> list:
+    conn = await asyncpg.connect(env.str("DB"))
+    result = await conn.fetch("""SELECT appid FROM fast_games""")
+    await conn.close()
+    return [i['appid'] for i in result]
