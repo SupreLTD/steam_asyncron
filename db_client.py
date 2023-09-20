@@ -1,3 +1,5 @@
+from random import shuffle
+
 import asyncpg
 import psycopg2
 from funcy import chunks

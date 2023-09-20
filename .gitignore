@@ -3,3 +3,4 @@ poetry.lock
 .ruff_cache
 .idea
 proxies.txt
+proxies_for_fast.txt
