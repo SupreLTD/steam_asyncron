@@ -1,11 +1,10 @@
 import asyncio
 
-from links_refresher import refresh_links
-from gam_parser import parse
+from fast_prise_parser import fast_price
 
 
 def main() -> None:
-    asyncio.run(refresh_links())
+    asyncio.run(fast_price())
     asyncio.run(parse())
 
 

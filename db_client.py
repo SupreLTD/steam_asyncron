@@ -134,3 +134,19 @@ async def ids_for_fast() -> list:
     result = await conn.fetch("""SELECT appid FROM fast_games""")
     await conn.close()
     return [i['appid'] for i in result]
+
+
+async def update_price_fast(cur: str, data: list[tuple]) -> None:
+    query = f"UPDATE fast_games SET {cur}_price = $2, {cur}_full_price = $1 WHERE appid = $3"
+    async with await asyncpg.create_pool(env.str("DB")) as pool:
+        async with pool.acquire() as conn:
+            await conn.executemany(query, data)
+
+
+async def get_all_games() -> list[list]:
+    async with await asyncpg.create_pool(env.str("DB")) as pool:
+        async with pool.acquire() as conn:
+            result = await conn.fetch("""SELECT appid, title, title, tr_price, tr_full_price, ar_price, ar_full_price, 
+            kz_price, kz_full_price, ru_price, ru_full_price, developer, publisher, dlc, genre, release, platform, 
+            language, cover, images, description, requirements  FROM fast_games""")
+            return [list(i) for i in result]
